@@ -1,46 +1,57 @@
 # WeatherMood
 
-Analiza korelacji między pogodą a nastrojami społecznymi w 5 miastach Europy (Warszawa, Londyn, Madryt, Sztokholm, Rzym).
+Analiza korelacji między pogodą a nastrojami społecznymi w 5 krajach Europy (Polska, UK, Hiszpania, Szwecja, Włochy).
 
 ## Źródła danych
-- **OpenWeather API** — bieżące dane pogodowe (temperatura, ciśnienie, wilgotność).
-- **GDELT Doc 2.0 API** — nastroje medialne (Tone Score) na podstawie analizy artykułów z ostatnich 24 godzin.
+
+- **OpenWeather API** — bieżące dane pogodowe (temperatura, ciśnienie, wilgotność, zachmurzenie)
+- **Currents API** — nastroje medialne (polarity score) na podstawie analizy nagłówków prasowych per kraj
+- **GDELT Doc 2.0 API** — uzupełniające nastroje medialne (Tone Score) z globalnej bazy artykułów
 
 ---
 
-## Konfiguracja (Ważne przed uruchomieniem!)
+## Konfiguracja
 
-Projekt wymaga klucza autoryzacyjnego do OpenWeatherMap. GDELT API jest w 100% darmowe i nie wymaga logowania.
+Projekt wymaga kluczy do OpenWeatherMap oraz Currents API. GDELT nie wymaga klucza.
 
-1. W głównym katalogu projektu (jeden poziom wyżej niż folder `fetcher`) utwórz plik tekstowy o nazwie `API_KEYS.txt`.
-2. Wklej do niego swój klucz w poniższym formacie (zwróć uwagę na brak nawiasów i pustych znaków):
+1. W głównym katalogu projektu utwórz plik `API_KEYS.txt`
+2. Wklej klucze w poniższym formacie:
 
-   ```text
-   weather: TWOJ_KLUCZ_API_OPENWEATHER_TUTAJ
-   
+```text
+weather: TWOJ_KLUCZ_OPENWEATHER
+currents: TWOJ_KLUCZ_CURRENTS
 ```
 
-> **Uwaga dla kontrybutorów:** Upewnijcie się, że plik `API_KEYS.txt` znajduje się w waszym lokalnym pliku `.gitignore`, aby przypadkowo nie wypchnąć kluczy do repozytorium!
+Darmowe klucze:
+- OpenWeather: https://openweathermap.org/api
+- Currents API: https://currentsapi.services/en/register
+
+> **Uwaga:** Upewnij się że `API_KEYS.txt` jest w `.gitignore` — nigdy nie wypychaj kluczy do repozytorium!
 
 ---
 
 ## Uruchomienie
 
-Najpierw zainstaluj wymagane biblioteki:
+Zainstaluj wymagane biblioteki:
 
 ```bash
-pip install requests
+pip install requests textblob gdeltdoc
+python -m textblob.download_corpora
 ```
 
 ### Pobieranie danych pogodowych
-Zwraca surowe dane ustrukturyzowane w formacie JSON, gotowe do zasilenia bazy danych.
 
 ```bash
 python fetcher/weather_fetcher.py
 ```
 
-### Pobieranie danych o nastrojach
-Zwraca wskaźnik Tone Score dla zdefiniowanych miast w formacie JSON.
+### Pobieranie nastrojów — Currents API (główne źródło)
+
+```bash
+python fetcher/mood_fetcher_current.py
+```
+
+### Pobieranie nastrojów — GDELT (uzupełniające)
 
 ```bash
 python fetcher/mood_fetcher.py
@@ -49,5 +60,8 @@ python fetcher/mood_fetcher.py
 ---
 
 ## Uwagi techniczne
-* **Rate Limits (GDELT):** Skrypt `mood_fetcher.py` celowo usypia się na 3 sekundy po każdym mieście (`time.sleep(3)`). Zabezpiecza to przed nałożeniem blokady i błędem `429 Too Many Requests`.
-* **Konta OpenWeather:** Jeśli wygenerowałeś nowy klucz OpenWeatherMap, jego pełna aktywacja po stronie serwerów może zająć od kilku minut do 2 godzin. Do tego czasu API może zwracać błąd `401 Unauthorized`.
+
+- **Currents API** zwraca nagłówki w języku angielskim per kraj; sentiment liczony lokalnie przez TextBlob (polarity: -1.0 → +1.0)
+- **GDELT** bywa niestabilny i może timeoutować — znany problem z rate limitingiem po stronie serwera
+- **OpenWeather:** nowy klucz może być nieaktywny przez kilka minut do 2h po wygenerowaniu (błąd `401 Unauthorized`)
+- Skrypty nastrojów mają wbudowane `time.sleep()` żeby nie spamować serwerów

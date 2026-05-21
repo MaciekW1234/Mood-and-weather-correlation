@@ -1,66 +1,81 @@
-import requests
+"""
+mood_fetcher.py — pobieranie nastrojów medialnych z GDELT Doc API
+Używa biblioteki gdeltdoc (pip install gdeltdoc) zamiast surowych requestów.
+
+ZNANY PROBLEM: GDELT blokuje requesty z serwerów datacenter (403).
+Działa lokalnie na komputerze użytkownika, może nie działać w Dockerze/VPS.
+Plan B: mood_fetcher_newsapi.py (NewsAPI + TextBlob)
+"""
+
 import json
 import time
+from datetime import date, timedelta
 
-CITIES = ["Warsaw", "London", "Madrid", "Stockholm", "Rome"]
+try:
+    from gdeltdoc import GdeltDoc, Filters
+except ImportError:
+    raise ImportError("Zainstaluj bibliotekę: pip install gdeltdoc")
+
+COUNTRIES = {
+    "Poland": "Warsaw",
+    "UK": "London",
+    "Spain": "Madrid",
+    "Sweden": "Stockholm",
+    "Italy": "Rome Italy",
+}
+
+# Zakres dat: ostatnie 7 dni (GDELT wymaga min. kilku dni dla stabilnych wyników)
+END_DATE = date.today()
+START_DATE = END_DATE - timedelta(days=7)
 
 
-def fetch_media_mood(city: str, retries: int = 3) -> dict:
-    url = "https://api.gdeltproject.org/api/v2/doc/doc"
-    params = {
-        "query": f'"{city}"',
-        "mode": "ToneChart",
-        "format": "json",
-        "timespan": "24h"
-    }
+def fetch_tone(country_name: str, city: str) -> dict:
+    """
+    Pobiera średni tone score z GDELT dla danego miasta z ostatnich 7 dni.
+    Zwraca słownik z country, city, avg_tone, data_points lub błędem.
+    """
+    gd = GdeltDoc()
+    f = Filters(
+        keyword=city,
+        start_date=START_DATE.strftime("%Y-%m-%d"),
+        end_date=END_DATE.strftime("%Y-%m-%d"),
+    )
 
-    # Udajemy standardową przeglądarkę Chrome
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+    try:
+        timeline = gd.timeline_search("timelinetone", f)
 
-    for attempt in range(retries):
-        try:
-            # Ustawiamy timeout: max 10 sekund na połączenie i 10 na pobranie danych
-            response = requests.get(url, params=params, headers=headers, timeout=(10, 10))
+        if timeline is None or timeline.empty:
+            print(f"[WARN] Brak danych dla {city}")
+            return {"country": country_name, "city": city, "avg_tone": None, "data_points": 0, "source": "gdelt"}
 
-            # Sprawdzamy, czy odpowiedź to faktycznie JSON (zabezpieczenie przed 'Expecting value')
-            if "application/json" not in response.headers.get("Content-Type", ""):
-                raise ValueError("Serwer zwrócił dane, które nie są JSON-em (pewnie strona błędu).")
+        # Kolumna z tonem nazywa się "Average Tone" w bibliotece gdeltdoc
+        tone_col = "Average Tone" if "Average Tone" in timeline.columns else timeline.columns[1]
+        avg_tone = round(float(timeline[tone_col].mean()), 4)
+        data_points = len(timeline)
 
-            response.raise_for_status()
-            return response.json()
+        print(f"[OK] {city}: avg_tone={avg_tone}, punktów danych={data_points}")
+        return {
+            "country": country_name,
+            "city": city,
+            "avg_tone": avg_tone,
+            "data_points": data_points,
+            "source": "gdelt",
+        }
 
-        except requests.exceptions.Timeout:
-            print(f"[{attempt + 1}/{retries}] Timeout dla {city}. Ponawiam...")
-        except ValueError as e:
-            print(f"[{attempt + 1}/{retries}] Zły format danych dla {city} ({e}). Ponawiam...")
-        except requests.exceptions.RequestException as e:
-            print(f"[{attempt + 1}/{retries}] Błąd sieciowy dla {city}. Ponawiam...")
-
-        # Jeśli jesteśmy tutaj, znaczy że wystąpił błąd. Czekamy przed kolejną próbą.
-        # Wydłużamy czas oczekiwania z każdą próbą (tzw. exponential backoff)
-        time.sleep(2 ** attempt + 2)  # Czeka 3s, potem 4s, potem 6s
-
-    return {}  # Zwracamy pusty słownik, jeśli wszystkie 3 próby zawiodą
+    except Exception as e:
+        print(f"[ERROR] {city}: {type(e).__name__} — {e}")
+        return {"country": country_name, "city": city, "avg_tone": None, "data_points": 0, "source": "gdelt",
+                "error": str(e)}
 
 
 if __name__ == "__main__":
+    print(f"Pobieranie danych GDELT ({START_DATE} → {END_DATE})...\n")
     dataset = []
 
-    for city in CITIES:
-        data = fetch_media_mood(city)
+    for country, city in COUNTRIES.items():
+        result = fetch_tone(country, city)
+        dataset.append(result)
+        time.sleep(5)  # grzeczne opóźnienie między requestami
 
-        timeline_series = data.get("timeline", [])
-
-        if not timeline_series or not timeline_series[0].get("data"):
-            dataset.append({"city": city, "tone_score": None})
-        else:
-            time_points = timeline_series[0]["data"]
-            latest_tone = time_points[-1]["value"]
-            dataset.append({"city": city, "tone_score": latest_tone})
-
-        # Standardowe opóźnienie, żeby nie zespamować serwera przy przechodzeniu do kolejnego miasta
-        time.sleep(3)
-
+    print("\n--- Wyniki ---")
     print(json.dumps(dataset, indent=4))

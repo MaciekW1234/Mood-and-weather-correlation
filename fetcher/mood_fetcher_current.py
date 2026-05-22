@@ -1,5 +1,5 @@
 """
-mood_fetcher_newsapi.py — nastroje medialne przez Currents API + TextBlob
+mood_fetcher_current.py — nastroje medialne przez Currents API + TextBlob
 Zastępuje poprzednią wersję z NewsAPI.org (free tier blokował kraje inne niż US).
 
 Wymagania:

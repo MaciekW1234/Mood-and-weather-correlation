@@ -1,21 +1,23 @@
 """
-mood_fetcher_newsapi.py — Plan B dla nastrojów medialnych
-Pobiera nagłówki z NewsAPI.org i liczy sentiment lokalnie przez TextBlob.
+mood_fetcher_newsapi.py — nastroje medialne przez NewsAPI /v2/everything + TextBlob
+Używa endpointu /v2/everything (działa na free tier) zamiast /v2/top-headlines
+(który blokuje kraje inne niż US na darmowym planie).
 
 Wymagania:
     pip install requests textblob
-    python -m textblob.download_corpora  (jednorazowo, pobiera słowniki)
+    python -m textblob.download_corpora   (jednorazowo)
 
 Klucz API (darmowy): https://newsapi.org/register
-Wpisz go do pliku API_KEYS.txt w katalogu głównym projektu jako:
+Dodaj do API_KEYS.txt w katalogu głównym projektu:
     newsapi: TWOJ_KLUCZ
 
-Darmowy plan: 100 requestów/dobę, nagłówki z ostatnich 30 dni.
+Darmowy plan: 100 requestów/dobę, artykuły z ostatnich 30 dni.
 """
 
 import json
 import time
 import logging
+from datetime import date, timedelta
 from pathlib import Path
 
 import requests
@@ -24,14 +26,21 @@ from textblob import TextBlob
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-# Kody krajów wg ISO 3166-1 alpha-2 (obsługiwane przez NewsAPI)
+# Słowa kluczowe per kraj — /v2/everything nie filtruje po country code,
+# więc szukamy po nazwie kraju po angielsku
 COUNTRIES = {
-    "Poland": "pl",
-    "UK": "gb",
-    "Spain": "es",
-    "Sweden": "se",
-    "Italy": "it",
+    "Poland":  "Poland news",
+    "UK":      "United Kingdom news",
+    "Spain":   "Spain news",
+    "Sweden":  "Sweden news",
+    "Italy":   "Italy news",
 }
+
+NEWSAPI_URL = "https://newsapi.org/v2/everything"
+
+# Zakres dat: ostatnie 30 dni (max dla free tier)
+END_DATE   = date.today()
+START_DATE = END_DATE - timedelta(days=29)
 
 
 def get_api_key() -> str:
@@ -46,82 +55,76 @@ def get_api_key() -> str:
         raise FileNotFoundError(f"Brak pliku: {keys_file}")
 
 
-def fetch_headlines(country_code: str, api_key: str, page_size: int = 20) -> list[str]:
+def fetch_headlines(query: str, api_key: str, page_size: int = 20) -> list[str]:
     """
-    Pobiera top nagłówki dla danego kraju z NewsAPI.
-    Zwraca listę stringów (tytuły artykułów).
+    Pobiera artykuły z NewsAPI /v2/everything dla danego zapytania.
+    Zwraca listę tytułów artykułów z ostatnich 30 dni.
     """
-    url = "https://newsapi.org/v2/top-headlines"
     params = {
-        "country": country_code,
+        "q":        query,
+        "language": "en",
         "pageSize": page_size,
-        "apiKey": api_key,
+        "sortBy":   "publishedAt",
+        "from":     START_DATE.isoformat(),
+        "to":       END_DATE.isoformat(),
+        "apiKey":   api_key,
     }
-    response = requests.get(url, params=params, timeout=10)
+    response = requests.get(NEWSAPI_URL, params=params, timeout=10)
     response.raise_for_status()
-    print("RAW:", response.json())
     data = response.json()
 
     if data.get("status") != "ok":
         raise ValueError(f"NewsAPI error: {data.get('message', 'nieznany błąd')}")
 
-    headlines = [
+    return [
         article["title"]
         for article in data.get("articles", [])
         if article.get("title")
     ]
-    return headlines
 
 
 def compute_sentiment(headlines: list[str]) -> dict:
     """
     Liczy średni sentiment z listy nagłówków przez TextBlob.
-    Polarity: -1.0 (bardzo negatywny) do +1.0 (bardzo pozytywny)
-    Subjectivity: 0.0 (obiektywny) do 1.0 (subiektywny)
+    polarity:     -1.0 (b. negatywny) → +1.0 (b. pozytywny)
+    subjectivity:  0.0 (obiektywny)   →  1.0 (subiektywny)
     """
     if not headlines:
         return {"avg_polarity": None, "avg_subjectivity": None, "headline_count": 0}
 
-    polarities = [TextBlob(h).sentiment.polarity for h in headlines]
-    subjectivities = [TextBlob(h).sentiment.subjectivity for h in headlines]
-
+    scores = [TextBlob(h).sentiment for h in headlines]
     return {
-        "avg_polarity": round(sum(polarities) / len(polarities), 4),
-        "avg_subjectivity": round(sum(subjectivities) / len(subjectivities), 4),
-        "headline_count": len(headlines),
+        "avg_polarity":     round(sum(s.polarity     for s in scores) / len(scores), 4),
+        "avg_subjectivity": round(sum(s.subjectivity for s in scores) / len(scores), 4),
+        "headline_count":   len(headlines),
     }
 
 
-def fetch_country_mood(country_name: str, country_code: str, api_key: str) -> dict:
-    """
-    Główna funkcja: pobiera nagłówki i zwraca nastrój dla jednego kraju.
-    """
+def fetch_country_mood(country_name: str, query: str, api_key: str) -> dict:
     try:
-        headlines = fetch_headlines(country_code, api_key)
+        headlines = fetch_headlines(query, api_key)
         sentiment = compute_sentiment(headlines)
 
         log.info(
-            f"{country_name} ({country_code}): "
-            f"polarity={sentiment['avg_polarity']}, "
+            f"{country_name}: polarity={sentiment['avg_polarity']}, "
             f"nagłówków={sentiment['headline_count']}"
         )
-
         return {
-            "country": country_name,
-            "country_code": country_code,
-            "avg_polarity": sentiment["avg_polarity"],
+            "country":          country_name,
+            "avg_polarity":     sentiment["avg_polarity"],
             "avg_subjectivity": sentiment["avg_subjectivity"],
-            "headline_count": sentiment["headline_count"],
-            "source": "newsapi+textblob",
+            "headline_count":   sentiment["headline_count"],
+            "date_range":       f"{START_DATE} → {END_DATE}",
+            "source":           "newsapi+textblob",
         }
 
     except requests.exceptions.RequestException as e:
         log.error(f"{country_name}: błąd sieciowy — {e}")
-        return {"country": country_name, "country_code": country_code, "avg_polarity": None,
+        return {"country": country_name, "avg_polarity": None,
                 "source": "newsapi+textblob", "error": str(e)}
     except Exception as e:
         log.error(f"{country_name}: {type(e).__name__} — {e}")
-        return {"country": country_name, "country_code": country_code, "avg_polarity": None,
+        return {"country": country_name, "avg_polarity": None,
                 "source": "newsapi+textblob", "error": str(e)}
 
 
@@ -129,12 +132,12 @@ if __name__ == "__main__":
     api_key = get_api_key()
     dataset = []
 
-    print(f"Pobieranie nastrojów z NewsAPI dla {len(COUNTRIES)} krajów...\n")
+    print(f"Pobieranie nastrojów z NewsAPI ({START_DATE} → {END_DATE})...\n")
 
-    for country_name, country_code in COUNTRIES.items():
-        result = fetch_country_mood(country_name, country_code, api_key)
+    for country_name, query in COUNTRIES.items():
+        result = fetch_country_mood(country_name, query, api_key)
         dataset.append(result)
-        time.sleep(1)  # grzeczne opóźnienie
+        time.sleep(1)
 
     print("\n--- Wyniki ---")
     print(json.dumps(dataset, indent=4))

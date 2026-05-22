@@ -1,5 +1,5 @@
 """
-mood_fetcher.py — pobieranie nastrojów medialnych z GDELT Doc API
+mood_fetcher_GDELT.py — pobieranie nastrojów medialnych z GDELT Doc API
 Używa biblioteki gdeltdoc (pip install gdeltdoc) zamiast surowych requestów.
 
 ZNANY PROBLEM: GDELT blokuje requesty z serwerów datacenter (403).

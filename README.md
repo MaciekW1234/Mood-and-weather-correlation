@@ -42,7 +42,7 @@ python -m textblob.download_corpora
 ### Pobieranie danych pogodowych
 
 ```bash
-python fetcher/weather_fetcher.py
+python fetcher/weather_fetcher_open_weather.py
 ```
 
 ### Pobieranie nastrojów — Currents API (główne źródło)
@@ -54,7 +54,7 @@ python fetcher/mood_fetcher_current.py
 ### Pobieranie nastrojów — GDELT (uzupełniające)
 
 ```bash
-python fetcher/mood_fetcher.py
+python fetcher/mood_fetcher_GDELT.py
 ```
 
 ---

@@ -1,67 +1,101 @@
 # WeatherMood
 
-Analiza korelacji między pogodą a nastrojami społecznymi w 5 krajach Europy (Polska, UK, Hiszpania, Szwecja, Włochy).
+Analiza korelacji między pogodą a nastrojami społecznymi w 5 krajach Europy:
+Polska, Wielka Brytania, Hiszpania, Szwecja, Włochy.
+
+---
+
+## Architektura
+
+```
+Open-Meteo API  ──┐
+NewsAPI         ──┤──► fetcher/ ──► PostgreSQL ──► FastAPI ──► Dashboard
+Currents API    ──┤
+GDELT API       ──┘
+```
+
+---
 
 ## Źródła danych
 
-- **OpenWeather API** — bieżące dane pogodowe (temperatura, ciśnienie, wilgotność, zachmurzenie)
-- **Currents API** — nastroje medialne (polarity score) na podstawie analizy nagłówków prasowych per kraj
-- **GDELT Doc 2.0 API** — uzupełniające nastroje medialne (Tone Score) z globalnej bazy artykułów
+| Źródło | Co dostarcza | Klucz API |
+|---|---|---|
+| **Open-Meteo** | Dane pogodowe — historia 30 dni (temp, opady, zachmurzenie) | Nie wymagany |
+| **NewsAPI** | Nastroje medialne — nagłówki z 30 dni, sentiment przez TextBlob | Wymagany (darmowy) |
+| **Currents API** | Nastroje medialne — bieżące nagłówki per kraj | Wymagany (darmowy) |
+| **GDELT** | Nastroje medialne — tone score z globalnej bazy artykułów | Nie wymagany |
+
+> GDELT bywa niestabilny — traktujemy go jako źródło uzupełniające.
 
 ---
 
 ## Konfiguracja
 
-Projekt wymaga kluczy do OpenWeatherMap oraz Currents API. GDELT nie wymaga klucza.
-
 1. W głównym katalogu projektu utwórz plik `API_KEYS.txt`
 2. Wklej klucze w poniższym formacie:
 
 ```text
-weather: TWOJ_KLUCZ_OPENWEATHER
+newsapi: TWOJ_KLUCZ_NEWSAPI
 currents: TWOJ_KLUCZ_CURRENTS
 ```
 
-Darmowe klucze:
-- OpenWeather: https://openweathermap.org/api
+Rejestracja (darmowa):
+- NewsAPI: https://newsapi.org/register
 - Currents API: https://currentsapi.services/en/register
 
-> **Uwaga:** Upewnij się że `API_KEYS.txt` jest w `.gitignore` — nigdy nie wypychaj kluczy do repozytorium!
+> **Ważne:** `API_KEYS.txt` jest w `.gitignore` — nigdy nie wypychaj kluczy do repozytorium!
 
 ---
 
-## Uruchomienie
-
-Zainstaluj wymagane biblioteki:
+## Instalacja
 
 ```bash
 pip install requests textblob gdeltdoc
 python -m textblob.download_corpora
 ```
 
-### Pobieranie danych pogodowych
+---
 
+## Uruchomienie fetcherów
+
+### Pogoda — Open-Meteo (30 dni historii, bez klucza)
 ```bash
-python fetcher/weather_fetcher_open_weather.py
+python fetcher/weather_fetcher_open_meteo.py
 ```
 
-### Pobieranie nastrojów — Currents API (główne źródło)
+### Nastroje — NewsAPI (30 dni historii, wymaga klucza)
+```bash
+python fetcher/mood_fetcher_newsapi.py
+```
 
+### Nastroje — Currents API (bieżące dane, wymaga klucza)
 ```bash
 python fetcher/mood_fetcher_current.py
 ```
 
-### Pobieranie nastrojów — GDELT (uzupełniające)
-
+### Nastroje — GDELT (uzupełniające, bez klucza)
 ```bash
 python fetcher/mood_fetcher_GDELT.py
 ```
 
 ---
 
+## Baza danych
+
+Schemat bazy danych PostgreSQL znajduje się w `database/schema.sql`.
+
+Zawiera tabele `weather` i `sentiment` oraz widok `correlation_view`
+łączący obie tabele po kraju i dacie — używany przez API do endpointu `/correlation/{country}`.
+
+```bash
+psql -U postgres -d weathermood -f database/schema.sql
+```
+
+---
+
 ## Uwagi techniczne
 
-- **Currents API** zwraca nagłówki w języku angielskim per kraj; sentiment liczony lokalnie przez TextBlob (polarity: -1.0 → +1.0)
-- **GDELT** bywa niestabilny i może timeoutować — znany problem z rate limitingiem po stronie serwera
-- **OpenWeather:** nowy klucz może być nieaktywny przez kilka minut do 2h po wygenerowaniu (błąd `401 Unauthorized`)
+- Open-Meteo zwraca dane dzienne per miasto; sentiment liczony jest per kraj
+- NewsAPI `/v2/everything` filtruje po słowie kluczowym (nazwa kraju), nie po country code
+- TextBlob liczy polarity w skali -1.0 → +1.0; GDELT używa skali -100 → +100
 - Skrypty nastrojów mają wbudowane `time.sleep()` żeby nie spamować serwerów

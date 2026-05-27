@@ -1,2 +1,25 @@
-.venv
+# środowisko i klucze
+.env
 API_KEYS.txt
+
+# python
+.venv
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# system
+.DS_Store
+Thumbs.db
+
+# docker
+*.log

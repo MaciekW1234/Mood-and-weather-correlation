@@ -2,10 +2,12 @@ services:
   db:
     image: postgres:16-alpine
     container_name: weathermood-db
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: weathermood
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:

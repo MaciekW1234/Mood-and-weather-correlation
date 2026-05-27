@@ -1,0 +1,7 @@
+services:
+  db:
+    container_name: weathermood-db-test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data

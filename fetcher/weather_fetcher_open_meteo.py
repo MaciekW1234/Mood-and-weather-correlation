@@ -1,30 +1,31 @@
 """
-weather_fetcher_open_weather.py — pobieranie historycznych danych pogodowych z Open-Meteo
-Zastępuje poprzednią wersję opartą na OpenWeather API.
+weather_fetcher_open_meteo.py — historyczne dane pogodowe z Open-Meteo
+Pobiera dane DZIENNE (jeden rekord = miasto x dzień) i zapisuje do bazy PostgreSQL.
 
 Zalety Open-Meteo:
-- Całkowicie darmowe dla zastosowań niekomercyjnych
-- Bez klucza API, bez rejestracji
-- Dane historyczne od 1940 roku
-- Do 10 000 requestów dziennie
+- Darmowe, bez klucza API, bez rejestracji
+- Dane historyczne, do 10 000 requestów/dzień
+- 30 dni jednym zapytaniem (5 zapytań na całość)
 
 Wymagania:
-    pip install requests
+    pip install requests psycopg2-binary
 
 Dokumentacja: https://open-meteo.com/en/docs/historical-weather-api
 """
 
-import json
+import os
 import time
 import logging
 from datetime import date, timedelta
 
 import requests
+import psycopg2
+from psycopg2.extras import execute_values
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-# Współrzędne miast (Open-Meteo używa lat/lon zamiast nazwy miasta)
+# Współrzędne miast (Open-Meteo używa lat/lon)
 CITIES = {
     "Warsaw":    {"country": "Poland",  "lat": 52.23,  "lon": 21.01,  "timezone": "Europe/Warsaw"},
     "London":    {"country": "UK",      "lat": 51.51,  "lon": -0.13,  "timezone": "Europe/London"},
@@ -36,22 +37,34 @@ CITIES = {
 HISTORICAL_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 # Zakres dat: ostatnie 30 dni
-END_DATE   = date.today() - timedelta(days=1)  # wczoraj (dziś może być niekompletny)
-START_DATE = END_DATE - timedelta(days=29)      # 30 dni wstecz
+END_DATE   = date.today() - timedelta(days=1)   # wczoraj (dziś bywa niekompletny)
+START_DATE = END_DATE - timedelta(days=29)       # 30 dni wstecz
 
 
+# ----------------------------------------------------------------------
+# Połączenie z bazą (Docker-friendly: czyta zmienne środowiskowe)
+# ----------------------------------------------------------------------
+def get_connection():
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
+        dbname=os.getenv("DB_NAME", "weathermood"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "postgres"),
+    )
+
+
+# ----------------------------------------------------------------------
+# Pobieranie danych pogodowych dla jednego miasta (30 dni jednym zapytaniem)
+# ----------------------------------------------------------------------
 def fetch_weather_history(city: str, meta: dict) -> list[dict]:
-    """
-    Pobiera dzienne dane pogodowe dla jednego miasta z ostatnich 30 dni.
-    Zwraca listę słowników — jeden per dzień.
-    """
     params = {
-        "latitude":               meta["lat"],
-        "longitude":              meta["lon"],
-        "start_date":             START_DATE.isoformat(),
-        "end_date":               END_DATE.isoformat(),
-        "daily":                  "temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean",
-        "timezone":               meta["timezone"],
+        "latitude":   meta["lat"],
+        "longitude":  meta["lon"],
+        "start_date": START_DATE.isoformat(),
+        "end_date":   END_DATE.isoformat(),
+        "daily":      "temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean",
+        "timezone":   meta["timezone"],
     }
 
     try:
@@ -69,15 +82,15 @@ def fetch_weather_history(city: str, meta: dict) -> list[dict]:
         records = []
         for i, day in enumerate(dates):
             records.append({
-                "city":         city,
-                "country":      meta["country"],
-                "date":         day,
-                "temp_mean":    daily["temperature_2m_mean"][i],
-                "temp_max":     daily["temperature_2m_max"][i],
-                "temp_min":     daily["temperature_2m_min"][i],
+                "city":          city,
+                "country":       meta["country"],
+                "date":          day,
+                "temp_mean":     daily["temperature_2m_mean"][i],
+                "temp_max":      daily["temperature_2m_max"][i],
+                "temp_min":      daily["temperature_2m_min"][i],
                 "precipitation": daily["precipitation_sum"][i],
-                "cloudcover":   daily["cloudcover_mean"][i],
-                "source":       "open-meteo",
+                "cloudcover":    daily["cloudcover_mean"][i],
+                "source":        "open-meteo",
             })
 
         log.info(f"{city}: pobrano {len(records)} dni ({START_DATE} → {END_DATE})")
@@ -91,15 +104,61 @@ def fetch_weather_history(city: str, meta: dict) -> list[dict]:
         return []
 
 
+# ----------------------------------------------------------------------
+# Zapis do bazy (idempotentny: ON CONFLICT na (city, date))
+# ----------------------------------------------------------------------
+def save_to_db(records: list[dict]) -> int:
+    if not records:
+        log.warning("Brak rekordów do zapisu.")
+        return 0
+
+    # zamiana słowników na krotki w kolejności kolumn tabeli weather
+    rows = [
+        (
+            r["city"], r["country"], r["date"],
+            r["temp_mean"], r["temp_max"], r["temp_min"],
+            r["precipitation"], r["cloudcover"], r["source"],
+        )
+        for r in records
+    ]
+
+    sql = """
+        INSERT INTO weather
+            (city, country, date, temp_mean, temp_max, temp_min,
+             precipitation, cloudcover, source)
+        VALUES %s
+        ON CONFLICT (city, date) DO UPDATE SET
+            temp_mean     = EXCLUDED.temp_mean,
+            temp_max      = EXCLUDED.temp_max,
+            temp_min      = EXCLUDED.temp_min,
+            precipitation = EXCLUDED.precipitation,
+            cloudcover    = EXCLUDED.cloudcover,
+            country       = EXCLUDED.country,
+            source        = EXCLUDED.source;
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+        log.info(f"Zapisano/zaktualizowano {len(rows)} rekordów w tabeli weather.")
+        return len(rows)
+    finally:
+        conn.close()
+
+
+# ----------------------------------------------------------------------
+# Main
+# ----------------------------------------------------------------------
 if __name__ == "__main__":
     print(f"Pobieranie danych pogodowych Open-Meteo ({START_DATE} → {END_DATE})...\n")
 
     all_records = []
     for city, meta in CITIES.items():
-        records = fetch_weather_history(city, meta)
-        all_records.extend(records)
+        all_records.extend(fetch_weather_history(city, meta))
         time.sleep(1)  # grzeczne opóźnienie
 
-    print(f"\n--- Wyniki: {len(all_records)} rekordów łącznie ---")
-    print(json.dumps(all_records[:3], indent=4))  # preview pierwszych 3
-    print(f"... i {len(all_records) - 3} więcej")
+    print(f"\nZebrano {len(all_records)} rekordów. Zapisywanie do bazy...")
+    save_to_db(all_records)
+    print("Gotowe.")

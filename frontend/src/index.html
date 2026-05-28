@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Weather-Mood Correlation</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Weather-Mood Correlation</h1>
+        <p>Analiza korelacji pogody z nastrojami społecznymi (Open-Meteo + Currents API)</p>
+    </header>
+
+    <main>
+        <section class="controls">
+            <label for="country-select">Kraj:</label>
+            <select id="country-select">
+                <option value="">— ładowanie —</option>
+            </select>
+        </section>
+
+        <section class="stats" id="stats">
+        </section>
+
+        <section class="chart-wrapper">
+            <canvas id="main-chart"></canvas>
+        </section>
+
+        <section class="status" id="status"></section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

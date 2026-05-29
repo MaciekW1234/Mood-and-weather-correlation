@@ -9,7 +9,7 @@
 <body>
     <header>
         <h1>Weather-Mood Correlation</h1>
-        <p>Analiza korelacji pogody z nastrojami społecznymi (Open-Meteo + Currents API)</p>
+        <p>Analiza korelacji pogody z nastrojami społecznymi</p>
     </header>
 
     <main>
@@ -18,16 +18,51 @@
             <select id="country-select">
                 <option value="">— ładowanie —</option>
             </select>
+            <span class="status" id="status"></span>
         </section>
 
-        <section class="stats" id="stats">
-        </section>
+        <section class="stats" id="stats"></section>
 
-        <section class="chart-wrapper">
-            <canvas id="main-chart"></canvas>
-        </section>
+        <div class="charts-grid">
+            <section class="chart-wrapper">
+                <h3>Temperatura a Nastrój w czasie</h3>
+                <canvas id="main-chart"></canvas>
+            </section>
 
-        <section class="status" id="status"></section>
+            <section class="chart-wrapper">
+                <h3>Zachmurzenie a Nastrój w czasie</h3>
+                <canvas id="cloud-chart"></canvas>
+            </section>
+        </div>
+
+        <div class="charts-grid">
+            <section class="chart-wrapper">
+                <h3>Rozkład: Temperatura vs Nastrój</h3>
+                <canvas id="scatter-chart"></canvas>
+            </section>
+
+            <section class="chart-wrapper">
+                <h3>Średni nastrój – porównanie krajów</h3>
+                <canvas id="bar-chart"></canvas>
+            </section>
+        </div>
+
+        <section class="table-wrapper">
+            <h3>Surowe dane (Wybrany kraj)</h3>
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Temp. średnia (°C)</th>
+                        <th>Zachmurzenie (%)</th>
+                        <th>Opady (mm)</th>
+                        <th>Polaryzacja nastroju</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    </tbody>
+            </table>
+        </section>
     </main>
 
     <script src="app.js"></script>

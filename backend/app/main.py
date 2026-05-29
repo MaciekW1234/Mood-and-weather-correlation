@@ -4,7 +4,7 @@ Dokumentacja Swagger UI dostępna pod /docs po uruchomieniu.
 """
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import get_connection
@@ -67,9 +67,8 @@ def health():
     description="Zwraca listę wszystkich krajów dla których dostępne są dane w bazie.",
     tags=["Dane"],
 )
-def get_countries():
+def get_countries(conn = Depends(get_connection)):
     """Lista krajów dostępnych w bazie."""
-    conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT country FROM weather ORDER BY country;")
@@ -93,9 +92,8 @@ Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
     response_description="Lista dziennych rekordów pogodowych posortowana po dacie.",
     tags=["Dane"],
 )
-def get_weather(country: str):
+def get_weather(country: str, conn = Depends(get_connection)):
     """Dzienne dane pogodowe dla danego kraju."""
-    conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -134,9 +132,8 @@ Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
     response_description="Lista dziennych rekordów nastrojów posortowana po dacie.",
     tags=["Dane"],
 )
-def get_sentiment(country: str):
+def get_sentiment(country: str, conn = Depends(get_connection)):
     """Dzienne nastroje dla danego kraju."""
-    conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -178,12 +175,11 @@ Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
     response_description="Współczynniki korelacji oraz lista punktów danych do wykresu.",
     tags=["Analiza"],
 )
-def get_correlation(country: str):
+def get_correlation(country: str, conn = Depends(get_connection)):
     """
     Połączone dane pogoda+nastrój dla kraju, wraz ze współczynnikami
     korelacji Pearsona (temperatura vs nastrój, zachmurzenie vs nastrój).
     """
-    conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(

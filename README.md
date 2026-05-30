@@ -197,10 +197,9 @@ Logi zapisywane do `logs/scheduler.log`.
 
 ## Autorzy
 
-- **Maciej** — infrastruktura (Docker, środowiska), frontend (dashboard, wykresy),
-  baza danych (schema, widoki), testy jednostkowe, testy wydajnościowe, logowanie
-- **[Twoje imię]** — fetchery danych (Open-Meteo, Currents API), backend REST API
-  (FastAPI, endpointy, Swagger), scheduler, integracja z bazą danych
+- **Maciej** — infrastruktura (Docker, środowiska), backend REST API
+  (FastAPI, endpointy, Swagger), baza danych (schema, widoki), frontend, testy jednostkowe, testy wydajnościowe, logowanie
+- **Kacper** — fetchery danych (Open-Meteo, Currents API), scheduler, integracja z bazą danych, dokumentacja, frontend (dashboard, wykresy)
 
 ---
 

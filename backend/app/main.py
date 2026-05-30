@@ -13,8 +13,13 @@ from app.models import (
     CorrelationResponse, CorrelationPoint,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-log = logging.getLogger(__name__)
+import sys
+from pathlib import Path
+# logging_config leży 2 poziomy wyżej: backend/app/main.py -> backend/ -> root
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from logging_config import setup_logging
+
+log = setup_logging(__name__)
 
 app = FastAPI(
     title="WeatherMood API",
@@ -49,6 +54,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def log_requests(request, call_next):
+    response = await call_next(request)
+    log.info(f'{request.method} {request.url.path} -> {response.status_code}')
+    return response
 
 @app.get(
     "/health",
@@ -218,3 +228,5 @@ def get_correlation(country: str, conn = Depends(get_connection)):
         )
     finally:
         conn.close()
+
+log.info("=== TEST: main.py został załadowany ===")

@@ -101,6 +101,19 @@ currents: TWOJ_KLUCZ_CURRENTS
 
 > `API_KEYS.txt` jest w `.gitignore` — nie wypychaj kluczy do repozytorium.
 
+### Konfiguracja zmiennych środowiskowych (.env)
+
+Zanim uruchomisz projekt, musisz skonfigurować połączenie z bazą danych. W głównym katalogu projektu (tam, gdzie znajduje się ten plik README) utwórz nowy plik o nazwie `.env`. 
+
+Dla domyślnego, lokalnego uruchomienia bazy PostgreSQL wpisz w nim następujące dane (użytkownik i hasło to `postgres`):
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=weathermood
+DB_USER=postgres
+DB_PASSWORD=postgres
+```
 ### Instalacja zależności
 
 ```bash
@@ -198,7 +211,7 @@ Logi zapisywane do `logs/scheduler.log`.
 ## Autorzy
 
 - **Maciej** — infrastruktura (Docker, środowiska), backend REST API
-  (FastAPI, endpointy, Swagger), baza danych (schema, widoki), frontend, testy jednostkowe, testy wydajnościowe, logowanie
+  (FastAPI, endpointy, Swagger), baza danych (schema, widoki), frontendgit, testy jednostkowe, testy wydajnościowe, logowanie
 - **Kacper** — fetchery danych (Open-Meteo, Currents API), scheduler, integracja z bazą danych, dokumentacja, frontend (dashboard, wykresy)
 
 ---

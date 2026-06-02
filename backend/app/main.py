@@ -126,8 +126,8 @@ def get_weather(country: str, conn = Depends(get_connection)):
     Zwraca dzienne nastroje medialne dla wybranego kraju z ostatnich 30 dni.
     Sentiment liczony lokalnie przez **TextBlob** na podstawie nagłówków prasowych
     pobranych z **Currents API**.
-    - `avg_polarity`: -1.0 (bardzo negatywny) → +1.0 (bardzo pozytywny)
-    - `avg_subjectivity`: 0.0 (obiektywny) → 1.0 (subiektywny)
+    - `avg_polarity`: -1.0 (bardzo negatywny) -- +1.0 (bardzo pozytywny)
+    - `avg_subjectivity`: 0.0 (obiektywny) -- 1.0 (subiektywny)
     Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
     """,
     response_description="Lista dziennych rekordów nastrojów posortowana po dacie.",
@@ -167,7 +167,7 @@ def get_sentiment(country: str, conn = Depends(get_connection)):
     - `corr_temp_polarity`: korelacja temperatury z nastrojem
     - `corr_cloud_polarity`: korelacja zachmurzenia z nastrojem
 
-    Wartości: -1.0 (silna ujemna) → 0 (brak) → +1.0 (silna dodatnia)
+    Wartości: -1.0 (silna ujemna) -- 0 (brak) -- +1.0 (silna dodatnia)
 
     Korelacja liczona funkcją PostgreSQL `corr()` na widoku `correlation_view`.
 

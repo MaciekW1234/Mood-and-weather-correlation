@@ -163,7 +163,7 @@ def get_sentiment(country: str, conn = Depends(get_connection)):
     Zwraca współczynniki korelacji Pearsona między warunkami pogodowymi
     a nastrojami medialnymi dla wybranego kraju oraz punkty danych do wykresu.
 
-    ## Współczynniki korelacji
+    Współczynniki korelacji
     - `corr_temp_polarity`: korelacja temperatury z nastrojem
     - `corr_cloud_polarity`: korelacja zachmurzenia z nastrojem
 

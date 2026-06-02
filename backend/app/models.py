@@ -1,4 +1,4 @@
-"""Modele Pydantic — definiują kształt odpowiedzi JSON i zasilają Swagger UI."""
+# Modele Pydantic — definiują kształt odpowiedzi JSON i zasilają Swagger UI 
 from datetime import date
 from pydantic import BaseModel
 

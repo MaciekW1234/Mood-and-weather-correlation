@@ -10,10 +10,7 @@ from unittest.mock import Mock
 from weather_fetcher_open_meteo import fetch_weather_history
 
 
-# ============================================================
 # Pomocnik — atrapa odpowiedzi HTTP
-# ============================================================
-
 def _make_response(status_code=200, json_data=None):
     """Tworzy atrapę requests.Response."""
     response = Mock()
@@ -29,10 +26,7 @@ def _make_response(status_code=200, json_data=None):
     return response
 
 
-# ============================================================
 # Testy fetch_weather_history
-# ============================================================
-
 WARSAW_META = {
     "country": "Poland",
     "lat": 52.23,
@@ -42,7 +36,7 @@ WARSAW_META = {
 
 
 def test_fetch_weather_happy_path(mocker):
-    """Normalna odpowiedź Open-Meteo → fetcher zwraca listę rekordów per-dzień."""
+    # Normalna odpowiedź Open-Meteo - fetcher zwraca listę rekordów per-dzień.
     fake_response = _make_response(
         status_code=200,
         json_data={
@@ -60,10 +54,10 @@ def test_fetch_weather_happy_path(mocker):
 
     records = fetch_weather_history("Warsaw", WARSAW_META)
 
-    # 3 dni w odpowiedzi → 3 rekordy w wyniku
+    # 3 dni w odpowiedzi - 3 rekordy w wyniku
     assert len(records) == 3
 
-    # Sprawdźmy mapowanie pierwszego rekordu
+    # Mapowanie pierwszego rekordu
     first = records[0]
     assert first["city"] == "Warsaw"
     assert first["country"] == "Poland"
@@ -77,7 +71,7 @@ def test_fetch_weather_happy_path(mocker):
 
 
 def test_fetch_weather_preserves_order(mocker):
-    """Rekordy mają być w kolejności dat z odpowiedzi (równoległe tablice)."""
+    # Rekordy mają być w kolejności dat z odpowiedzi (równoległe tablice).
     fake_response = _make_response(
         status_code=200,
         json_data={
@@ -95,14 +89,13 @@ def test_fetch_weather_preserves_order(mocker):
 
     records = fetch_weather_history("Warsaw", WARSAW_META)
 
-    # Indeks i odpowiada dniu i — sprawdźmy że dane się nie pomieszały
     assert records[0]["temp_mean"] == 10.0
     assert records[1]["temp_mean"] == 20.0
     assert records[2]["temp_mean"] == 30.0
 
 
 def test_fetch_weather_empty_response(mocker):
-    """Open-Meteo zwraca pustą listę dni → fetcher zwraca pustą listę."""
+    # Open-Meteo zwraca pustą listę dni - fetcher zwraca pustą listę.
     fake_response = _make_response(
         status_code=200,
         json_data={"daily": {"time": []}},
@@ -115,7 +108,7 @@ def test_fetch_weather_empty_response(mocker):
 
 
 def test_fetch_weather_network_error_returns_empty(mocker):
-    """Błąd sieciowy → fetcher loguje i zwraca pustą listę, nie crashuje."""
+    # Błąd sieciowy - fetcher loguje i zwraca pustą listę, nie crashuje.
     mocker.patch(
         "weather_fetcher_open_meteo.requests.get",
         side_effect=requests.exceptions.ConnectionError("Network down"),
@@ -127,7 +120,7 @@ def test_fetch_weather_network_error_returns_empty(mocker):
 
 
 def test_fetch_weather_country_propagated_from_meta(mocker):
-    """Każdy rekord ma poprawny 'country' wzięty z meta."""
+    # Każdy rekord ma poprawny 'country' wzięty z meta.
     fake_response = _make_response(
         status_code=200,
         json_data={

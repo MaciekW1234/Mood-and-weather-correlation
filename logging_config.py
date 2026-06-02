@@ -29,7 +29,7 @@ def setup_logging(name: str | None = None) -> logging.Logger:
     level_name = os.getenv("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
 
-    # Konfigurujemy tylko raz — przy kolejnych wywołaniach handlery są już ustawione.
+    # Konfigurujemy tylko raz - przy kolejnych wywołaniach handlery są już ustawione.
     root = logging.getLogger()
     if not root.handlers:
         handler = logging.StreamHandler(sys.stdout)

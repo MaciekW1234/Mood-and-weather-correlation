@@ -24,10 +24,11 @@ from psycopg2.extras import execute_values
 
 import sys
 from pathlib import Path
-# żeby zaimportować logging_config z głównego katalogu projektu
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_config import setup_logging
-
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 log = setup_logging(__name__)
 
 # Współrzędne miast (Open-Meteo używa lat/lon)
@@ -42,26 +43,22 @@ CITIES = {
 HISTORICAL_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 # Zakres dat: ostatnie 30 dni
-END_DATE   = date.today() - timedelta(days=1)   # wczoraj (dziś bywa niekompletny)
-START_DATE = END_DATE - timedelta(days=29)       # 30 dni wstecz
+END_DATE   = date.today() - timedelta(days=1) 
+START_DATE = END_DATE - timedelta(days=29)
 
 
-# ----------------------------------------------------------------------
 # Połączenie z bazą (Docker-friendly: czyta zmienne środowiskowe)
-# ----------------------------------------------------------------------
 def get_connection():
     return psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "weathermood"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", "postgres"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
     )
 
 
-# ----------------------------------------------------------------------
 # Pobieranie danych pogodowych dla jednego miasta (30 dni jednym zapytaniem)
-# ----------------------------------------------------------------------
 def fetch_weather_history(city: str, meta: dict) -> list[dict]:
     params = {
         "latitude":   meta["lat"],
@@ -109,9 +106,7 @@ def fetch_weather_history(city: str, meta: dict) -> list[dict]:
         return []
 
 
-# ----------------------------------------------------------------------
 # Zapis do bazy (idempotentny: ON CONFLICT na (city, date))
-# ----------------------------------------------------------------------
 def save_to_db(records: list[dict]) -> int:
     if not records:
         log.warning("Brak rekordów do zapisu.")
@@ -153,11 +148,8 @@ def save_to_db(records: list[dict]) -> int:
         conn.close()
 
 
-# ----------------------------------------------------------------------
-# Main
-# ----------------------------------------------------------------------
 if __name__ == "__main__":
-    print(f"Pobieranie danych pogodowych Open-Meteo ({START_DATE} → {END_DATE})...\n")
+    print(f"Pobieranie danych pogodowych Open-Meteo ({START_DATE} - {END_DATE})...\n")
 
     all_records = []
     for city, meta in CITIES.items():

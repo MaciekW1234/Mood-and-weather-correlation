@@ -1,21 +1,19 @@
 """
-WeatherMood API — REST API wystawiające dane pogodowe, nastroje i korelacje.
+WeatherMood API - REST API wystawiające dane pogodowe, nastroje i korelacje.
 Dokumentacja Swagger UI dostępna pod /docs po uruchomieniu.
 """
 import logging
-
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-
 from app.db import get_connection
 from app.models import (
     WeatherRecord, SentimentRecord,
     CorrelationResponse, CorrelationPoint,
 )
-
 import sys
 from pathlib import Path
-# logging_config leży 2 poziomy wyżej: backend/app/main.py -> backend/ -> root
+
+# logging_config leży 2 poziomy wyżej
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from logging_config import setup_logging
 
@@ -28,28 +26,26 @@ API do analizy korelacji między warunkami pogodowymi a nastrojami społecznymi
 w 5 krajach Europy: Polsce, Wielkiej Brytanii, Hiszpanii, Szwecji i Włoszech.
 
 ## Źródła danych
-- **Open-Meteo** — historyczne dane pogodowe (temperatura, opady, zachmurzenie)
-- **Currents API + TextBlob** — nastroje medialne na podstawie nagłówków prasowych
+- **Open-Meteo** - historyczne dane pogodowe (temperatura, opady, zachmurzenie)
+- **Currents API + TextBlob** - nastroje medialne na podstawie nagłówków prasowych
 
 ## Endpointy
-- `/countries` — lista dostępnych krajów
-- `/weather/{country}` — dzienne dane pogodowe
-- `/sentiment/{country}` — dzienne nastroje medialne
-- `/correlation/{country}` — korelacja Pearsona pogoda↔nastroje + dane do wykresów
+- `/health` - healthcheck API
+- `/countries` - lista dostępnych krajów
+- `/weather/{country}` - dzienne dane pogodowe
+- `/sentiment/{country}` - dzienne nastroje medialne
+- `/correlation/{country}` - korelacja Pearsona pogoda↔nastroje + dane do wykresów
 """,
     version="1.0.0",
     contact={
-        "name": "WeatherMood Team",
-    },
-    license_info={
-        "name": "MIT",
+        "name": "WeatherMood projekt",
     },
 )
 
-# CORS — pozwala frontendowi (inna domena/port) wołać to API z przeglądarki
+# CORS pozwala frontendowi (inna domena/port) wołać to API z przeglądarki
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # na dev OK; w prod zawęzić do domeny frontendu
+    allow_origins=["*"], 
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -67,7 +63,7 @@ async def log_requests(request, call_next):
     tags=["System"],
 )
 def health():
-    """Healthcheck — używany m.in. przez Docker."""
+    # Healthcheck
     return {"status": "ok"}
 
 
@@ -78,7 +74,7 @@ def health():
     tags=["Dane"],
 )
 def get_countries(conn = Depends(get_connection)):
-    """Lista krajów dostępnych w bazie."""
+    # Lista krajów dostępnych w bazie.
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT country FROM weather ORDER BY country;")
@@ -94,16 +90,14 @@ def get_countries(conn = Depends(get_connection)):
     summary="Dane pogodowe dla kraju",
     description="""
 Zwraca dzienne dane pogodowe dla wybranego kraju z ostatnich 30 dni.
-
 Źródło: **Open-Meteo Historical API** (bez klucza API).
-
 Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
 """,
     response_description="Lista dziennych rekordów pogodowych posortowana po dacie.",
     tags=["Dane"],
 )
 def get_weather(country: str, conn = Depends(get_connection)):
-    """Dzienne dane pogodowe dla danego kraju."""
+    # Dzienne dane pogodowe dla danego kraju.
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -129,21 +123,18 @@ def get_weather(country: str, conn = Depends(get_connection)):
     response_model=list[SentimentRecord],
     summary="Nastroje medialne dla kraju",
     description="""
-Zwraca dzienne nastroje medialne dla wybranego kraju z ostatnich 30 dni.
-
-Sentiment liczony lokalnie przez **TextBlob** na podstawie nagłówków prasowych
-pobranych z **Currents API**.
-
-- `avg_polarity`: -1.0 (bardzo negatywny) → +1.0 (bardzo pozytywny)
-- `avg_subjectivity`: 0.0 (obiektywny) → 1.0 (subiektywny)
-
-Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
-""",
+    Zwraca dzienne nastroje medialne dla wybranego kraju z ostatnich 30 dni.
+    Sentiment liczony lokalnie przez **TextBlob** na podstawie nagłówków prasowych
+    pobranych z **Currents API**.
+    - `avg_polarity`: -1.0 (bardzo negatywny) → +1.0 (bardzo pozytywny)
+    - `avg_subjectivity`: 0.0 (obiektywny) → 1.0 (subiektywny)
+    Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
+    """,
     response_description="Lista dziennych rekordów nastrojów posortowana po dacie.",
     tags=["Dane"],
 )
 def get_sentiment(country: str, conn = Depends(get_connection)):
-    """Dzienne nastroje dla danego kraju."""
+    # dzienne nastroje dla danego kraju
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -169,27 +160,25 @@ def get_sentiment(country: str, conn = Depends(get_connection)):
     response_model=CorrelationResponse,
     summary="Korelacja pogoda↔nastroje",
     description="""
-Zwraca współczynniki korelacji Pearsona między warunkami pogodowymi
-a nastrojami medialnymi dla wybranego kraju oraz punkty danych do wykresu.
+    Zwraca współczynniki korelacji Pearsona między warunkami pogodowymi
+    a nastrojami medialnymi dla wybranego kraju oraz punkty danych do wykresu.
 
-## Współczynniki korelacji
-- `corr_temp_polarity`: korelacja temperatury z nastrojem
-- `corr_cloud_polarity`: korelacja zachmurzenia z nastrojem
+    ## Współczynniki korelacji
+    - `corr_temp_polarity`: korelacja temperatury z nastrojem
+    - `corr_cloud_polarity`: korelacja zachmurzenia z nastrojem
 
-Wartości: -1.0 (silna ujemna) → 0 (brak) → +1.0 (silna dodatnia)
+    Wartości: -1.0 (silna ujemna) → 0 (brak) → +1.0 (silna dodatnia)
 
-Korelacja liczona funkcją PostgreSQL `corr()` na widoku `correlation_view`.
+    Korelacja liczona funkcją PostgreSQL `corr()` na widoku `correlation_view`.
 
-Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
-""",
+    Dostępne kraje: `Poland`, `UK`, `Spain`, `Sweden`, `Italy`
+    """,
     response_description="Współczynniki korelacji oraz lista punktów danych do wykresu.",
     tags=["Analiza"],
 )
 def get_correlation(country: str, conn = Depends(get_connection)):
-    """
-    Połączone dane pogoda+nastrój dla kraju, wraz ze współczynnikami
-    korelacji Pearsona (temperatura vs nastrój, zachmurzenie vs nastrój).
-    """
+    # połączone dane pogoda+nastrój dla kraju, wraz ze współczynnikami korelacji Pearsona (temperatura vs nastrój, zachmurzenie vs nastrój)
+
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -228,5 +217,3 @@ def get_correlation(country: str, conn = Depends(get_connection)):
         )
     finally:
         conn.close()
-
-log.info("=== TEST: main.py został załadowany ===")

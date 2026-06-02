@@ -11,7 +11,7 @@ Wymagania:
 
 Klucz API (darmowy, 1000 req/dzień): https://currentsapi.services/en/register
 Dodaj do API_KEYS.txt w katalogu głównym projektu:
-    currents:TWOJ_KLUCZ
+currents:TWOJ_KLUCZ
 """
 
 import os
@@ -19,15 +19,14 @@ import time
 import logging
 from pathlib import Path
 from datetime import date, timedelta, datetime, timezone
-
 import requests
 import psycopg2
 from psycopg2.extras import execute_values
 from textblob import TextBlob
-
 import sys
-from pathlib import Path
-# żeby zaimportować logging_config z głównego katalogu projektu
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_config import setup_logging
 
@@ -45,8 +44,8 @@ COUNTRIES = {
 CURRENTS_SEARCH_URL = "https://api.currentsapi.services/v1/search"
 
 # Zakres dat: ostatnie 30 dni
-END_DATE   = date.today() - timedelta(days=1)   # wczoraj (dziś bywa niekompletny)
-START_DATE = END_DATE - timedelta(days=29)       # 30 dni wstecz
+END_DATE   = date.today() - timedelta(days=1)
+START_DATE = END_DATE - timedelta(days=29) 
 
 
 # Klucz API
@@ -68,17 +67,15 @@ def get_connection():
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "weathermood"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", "postgres"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
     )
 
 
 # Pobieranie nagłówków dla jednego kraju i jednego dnia
 def fetch_headlines_for_day(country_code: str, day: date, api_key: str, max_retries: int = 3) -> list[str]:
-    """
-    Pobiera nagłówki dla kraju z konkretnego dnia.
-    Przy 429 (rate limit) czeka i ponawia próbę.
-    """
+    #Pobiera nagłówki dla kraju z konkretnego dnia. Przy 429 (rate limit) czeka i ponawia próbę.
+
     start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
     end   = start + timedelta(days=1)
 
@@ -110,7 +107,7 @@ def fetch_headlines_for_day(country_code: str, day: date, api_key: str, max_retr
     raise requests.exceptions.RequestException(f"{country_code} {day}: przekroczono limit prób (429)")
 
 
-# Liczenie sentymentu (TextBlob)
+# Liczenie sentymentu (za pomoca TextBlob)
 def compute_sentiment(headlines: list[str]) -> dict:
     if not headlines:
         return {"avg_polarity": None, "avg_subjectivity": None, "headline_count": 0}
@@ -125,10 +122,8 @@ def compute_sentiment(headlines: list[str]) -> dict:
 
 # Zbieranie danych: pętla kraj x dzień
 def collect_records(api_key: str) -> list[tuple]:
-    """
-    Zwraca listę krotek gotowych do zapisu w tabeli sentiment:
-    (country, country_code, date, avg_polarity, avg_subjectivity, avg_tone, headline_count, source)
-    """
+    #Zwraca listę krotek gotowych do zapisu w tabeli sentiment: (country, country_code, date, avg_polarity, avg_subjectivity, headline_count, source)
+ 
     records = []
     total_days = (END_DATE - START_DATE).days + 1
 
@@ -145,7 +140,6 @@ def collect_records(api_key: str) -> list[tuple]:
                     day,
                     s["avg_polarity"],
                     s["avg_subjectivity"],
-                    None,                    # avg_tone — pole GDELT, tu NULL
                     s["headline_count"],
                     "currents+textblob",
                 ))
@@ -156,7 +150,7 @@ def collect_records(api_key: str) -> list[tuple]:
             except Exception as e:
                 log.error(f"{country_name} {day}: {type(e).__name__} — {e}")
 
-            time.sleep(1.5)  # grzeczne opóźnienie między zapytaniami
+            time.sleep(1.5)  # żeby nie przekroczyć limitu 
 
     return records
 
@@ -169,13 +163,11 @@ def save_to_db(records: list[tuple]) -> int:
 
     sql = """
         INSERT INTO sentiment
-            (country, country_code, date, avg_polarity, avg_subjectivity,
-             avg_tone, headline_count, source)
+            (country, country_code, date, avg_polarity, avg_subjectivity, headline_count, source)
         VALUES %s
         ON CONFLICT (country, date, source) DO UPDATE SET
             avg_polarity     = EXCLUDED.avg_polarity,
             avg_subjectivity = EXCLUDED.avg_subjectivity,
-            avg_tone         = EXCLUDED.avg_tone,
             headline_count   = EXCLUDED.headline_count,
             country_code     = EXCLUDED.country_code;
     """
@@ -191,7 +183,6 @@ def save_to_db(records: list[tuple]) -> int:
         conn.close()
 
 
-# Main
 if __name__ == "__main__":
     api_key = get_api_key()
     print(f"Pobieranie nastrojów Currents ({START_DATE} → {END_DATE}) dla {len(COUNTRIES)} krajów...\n")

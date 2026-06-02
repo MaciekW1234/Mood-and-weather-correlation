@@ -1,35 +1,25 @@
 """
 Testy jednostkowe dla backendu FastAPI.
-
 Używamy:
   - TestClient z FastAPI — pozwala wołać endpointy bez stawiania serwera.
   - app.dependency_overrides — podmieniamy get_connection na atrapę,
     żeby testy nie wymagały prawdziwej bazy danych.
 """
 from unittest.mock import MagicMock
-
 import pytest
 from fastapi.testclient import TestClient
-
 from app.main import app
 from app.db import get_connection
 
 
-# ============================================================
 # Atrapa połączenia z bazą
-# ============================================================
-
 def make_fake_connection(rows):
-    """
-    Buduje atrapę psycopg2.connection, której kursor zwraca podane wiersze.
-    Wspiera context manager (with conn.cursor() as cur:).
-    """
+
     cursor = MagicMock()
     cursor.fetchall.return_value = rows
-    # fetchone zwraca pierwszy wiersz albo None
+
     cursor.fetchone.return_value = rows[0] if rows else None
 
-    # context manager: __enter__ zwraca kursor, __exit__ nic nie robi
     cursor.__enter__.return_value = cursor
     cursor.__exit__.return_value = False
 
@@ -39,7 +29,7 @@ def make_fake_connection(rows):
 
 
 def override_connection_with(rows):
-    """Pomocnik: ustawia dependency override na FastAPI dla danych testowych."""
+    # ustawia dependency override na FastAPI dla danych testowych
     fake = make_fake_connection(rows)
     app.dependency_overrides[get_connection] = lambda: fake
     return fake
@@ -47,7 +37,7 @@ def override_connection_with(rows):
 
 @pytest.fixture(autouse=True)
 def reset_overrides():
-    """Po każdym teście czyścimy nadpisania, żeby testy się nie zaśmiecały."""
+    # po każdym teście czyścimy nadpisania, żeby testy się nie zaśmiecały
     yield
     app.dependency_overrides.clear()
 
@@ -55,22 +45,16 @@ def reset_overrides():
 client = TestClient(app)
 
 
-# ============================================================
-# /health — najprostszy test, bez bazy
-# ============================================================
-
+# /health - test bez bazy
 def test_health_returns_ok():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-# ============================================================
 # /countries
-# ============================================================
-
 def test_countries_returns_list():
-    """Baza zwraca 3 kraje → endpoint zwraca je w polu 'countries'."""
+    # Baza zwraca 3 kraje - endpoint zwraca je w polu 'countries'
     override_connection_with([
         {"country": "Italy"},
         {"country": "Poland"},
@@ -84,7 +68,7 @@ def test_countries_returns_list():
 
 
 def test_countries_empty_database():
-    """Pusta baza → pusta lista, ale wciąż HTTP 200."""
+    # pusta baza - pusta lista, ale wciąż HTTP 200
     override_connection_with([])
 
     response = client.get("/countries")
@@ -93,12 +77,10 @@ def test_countries_empty_database():
     assert response.json() == {"countries": []}
 
 
-# ============================================================
-# /weather/{country}
-# ============================================================
 
+# /weather/{country}
 def test_weather_returns_records_for_country():
-    """Baza zwraca dane pogodowe → endpoint zwraca listę WeatherRecord."""
+    # baza zwraca dane pogodowe - endpoint zwraca listę WeatherRecord
     override_connection_with([
         {
             "date": "2026-05-01",
@@ -124,7 +106,7 @@ def test_weather_returns_records_for_country():
 
 
 def test_weather_unknown_country_returns_404():
-    """Brak danych dla kraju → HTTP 404 z sensownym komunikatem."""
+    # brak danych dla kraju - HTTP 404 z sensownym komunikatem
     override_connection_with([])
 
     response = client.get("/weather/Atlantis")
@@ -133,10 +115,7 @@ def test_weather_unknown_country_returns_404():
     assert "Atlantis" in response.json()["detail"]
 
 
-# ============================================================
 # /sentiment/{country}
-# ============================================================
-
 def test_sentiment_returns_records():
     override_connection_with([
         {
@@ -161,10 +140,7 @@ def test_sentiment_unknown_country_returns_404():
 
     assert response.status_code == 404
 
-# ============================================================
-# /correlation/{country} — dwa zapytania do bazy, trzeba je zmockować osobno
-# ============================================================
-
+# /correlation/{country} - dwa zapytania do bazy, trzeba je zmockować osobno
 def test_correlation_returns_stats_and_data():
     """
     /correlation/{country} robi dwa zapytania:

@@ -6,14 +6,15 @@ Testowane funkcje:
 """
 import pytest
 from mood_fetcher_current import compute_sentiment
+from datetime import date
+from mood_fetcher_current import fetch_headlines_for_day
+import requests
+from unittest.mock import Mock
 
 
-# ============================================================
 # Testy compute_sentiment — czysta funkcja, bez mocków
-# ============================================================
-
 def test_compute_sentiment_empty_list():
-    """Pusta lista nagłówków → polarity i subjectivity = None, count = 0."""
+    # Pusta lista nagłówków - polarity i subjectivity = None, count = 0.
     result = compute_sentiment([])
 
     assert result["avg_polarity"] is None
@@ -22,7 +23,7 @@ def test_compute_sentiment_empty_list():
 
 
 def test_compute_sentiment_single_headline():
-    """Jeden nagłówek → headline_count = 1, polarity to liczba w [-1, 1]."""
+    # Jeden nagłówek - polarity to liczba w [-1, 1].
     result = compute_sentiment(["Today is a wonderful and amazing day!"])
 
     assert result["headline_count"] == 1
@@ -32,7 +33,7 @@ def test_compute_sentiment_single_headline():
 
 
 def test_compute_sentiment_positive_text_has_positive_polarity():
-    """Zdecydowanie pozytywne nagłówki → dodatnia polaryzacja."""
+    # Zdecydowanie pozytywne nagłówki - dodatnia polaryzacja.
     headlines = [
         "Wonderful news, great success and amazing achievement!",
         "Excellent results, brilliant performance, fantastic outcome!",
@@ -43,7 +44,7 @@ def test_compute_sentiment_positive_text_has_positive_polarity():
 
 
 def test_compute_sentiment_negative_text_has_negative_polarity():
-    """Zdecydowanie negatywne nagłówki → ujemna polaryzacja."""
+    # Zdecydowanie negatywne nagłówki - ujemna polaryzacja.
     headlines = [
         "Terrible disaster, awful tragedy, horrible outcome.",
         "Worst news ever, devastating loss, painful defeat.",
@@ -54,20 +55,14 @@ def test_compute_sentiment_negative_text_has_negative_polarity():
 
 
 def test_compute_sentiment_headline_count_matches():
-    """headline_count powinien odpowiadać liczbie wejściowych nagłówków."""
+    # headline_count powinien odpowiadać liczbie wejściowych nagłówków.
     headlines = ["a", "b", "c", "d", "e"]
     result = compute_sentiment(headlines)
 
     assert result["headline_count"] == 5
 
-    # ============================================================
+
 # Testy fetch_headlines_for_day — z mockowaniem requests.get
-# ============================================================
-
-from datetime import date
-from mood_fetcher_current import fetch_headlines_for_day
-
-
 def _make_response(status_code=200, json_data=None):
     """
     Pomocnik: tworzy "atrapę" obiektu Response, który ma:
@@ -76,8 +71,6 @@ def _make_response(status_code=200, json_data=None):
       - .raise_for_status() która rzuca błąd dla 4xx/5xx.
     Używamy unittest.mock.Mock przez fixture `mocker`.
     """
-    import requests
-    from unittest.mock import Mock
 
     response = Mock()
     response.status_code = status_code
@@ -96,7 +89,7 @@ def _make_response(status_code=200, json_data=None):
 
 
 def test_fetch_headlines_happy_path(mocker):
-    """API zwraca normalną odpowiedź → fetcher wyciąga tytuły."""
+    # API zwraca normalną odpowiedź - fetcher wyciąga tytuły.
     fake_response = _make_response(
         status_code=200,
         json_data={

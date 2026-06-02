@@ -216,6 +216,3 @@ Logi zapisywane do `logs/scheduler.log`.
 
 ---
 
-## Licencja
-
-MIT

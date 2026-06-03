@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS sentiment (
     date            DATE           NOT NULL,
     avg_polarity    REAL,                        -- TextBlob: -1.0 (neg) → +1.0 (poz)
     avg_subjectivity REAL,                       -- TextBlob: 0.0 (obj) → 1.0 (subj)
-    avg_tone        REAL,                        -- GDELT tone: -100 → +100
     headline_count  INTEGER,                     -- liczba artykułów/nagłówków
     source          VARCHAR(50)    DEFAULT 'currents+textblob',
     created_at      TIMESTAMP      DEFAULT NOW(),
